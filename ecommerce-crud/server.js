@@ -1,52 +1,54 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const passport = require('./config/passport');
-const cors = require('cors');
-const session = require('express-session');
-
-const sessionsRouter = require('./routes/sessions.router');
-const usersRouter = require('./routes/users.router');
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+require("dotenv").config();
 
 const app = express();
+const PORT = process.env.PORT || 3000;
 
-// ===== Middlewares =====
-app.use(cors({
-  origin: 'http://localhost:3000', // Cambia al front que uses
-  credentials: true
-}));
+// ---------------- Middleware global ----------------
+app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Configuración de session
-app.use(session({
-  secret: 'claveSuperSecreta', // poner en .env en producción
-  resave: false,
-  saveUninitialized: false,
-  cookie: { secure: false } // true si usas HTTPS
-}));
+// ---------------- Routers ----------------
+const userRouter = require("./routes/users.router");
+const productRouter = require("./routes/products.router");
+const cartRouter = require("./routes/cart.router");
+const orderRouter = require("./routes/order.router");
+const checkoutRouter = require("./routes/checkout.router");
+const sessionsRouter = require("./routes/sessions.router"); // Login / JWT
 
-app.use(passport.initialize());
+app.use("/api/users", userRouter);
+app.use("/api/products", productRouter);
+app.use("/api/cart", cartRouter);
+app.use("/api/orders", orderRouter);
+app.use("/api/checkout", checkoutRouter);
+app.use("/api/sessions", sessionsRouter);
 
-// ===== Conexión a MongoDB Local =====
-mongoose.connect('mongodb://localhost:27017/ecommerce-mati', {
+// ---------------- Error handling ----------------
+app.use((req, res, next) => {
+  res.status(404).json({ error: "Ruta no encontrada" });
+});
+
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ error: "Error interno del servidor" });
+});
+
+// ---------------- Conexión a MongoDB ----------------
+const MONGO_URI = process.env.MONGO_URI || "mongodb://localhost:27017/ecommerce";
+
+mongoose.connect(MONGO_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-  .then(() => console.log('✅ MongoDB conectado'))
-  .catch(err => console.error('❌ Error al conectar MongoDB:', err));
-
-// ===== Rutas =====
-app.get('/', (req, res) => {
-  res.send('Servidor funcionando 🚀');
+.then(() => {
+  console.log("MongoDB conectado ✅");
+  app.listen(PORT, () => {
+    console.log(`Servidor escuchando en puerto ${PORT} 🚀`);
+  });
+})
+.catch(err => {
+  console.error("Error conectando a MongoDB:", err);
 });
-
-app.use('/api/sessions', sessionsRouter);
-app.use('/api/users', usersRouter);
-
-// Manejo de rutas no existentes
-app.use((req, res) => {
-  res.status(404).json({ error: 'Ruta no encontrada' });
-});
-
-// ===== Iniciar servidor =====
-const PORT = 5000;
-app.listen(PORT, () => console.log(`Servidor escuchando en puerto ${PORT}`));
